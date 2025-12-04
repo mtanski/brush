@@ -15,12 +15,12 @@ use crate::results::ExecutionSpawnResult;
 use crate::sys::fs::PathExt;
 use crate::variables::{self, ShellVariable};
 use crate::{
-    ExecutionControlFlow, ExecutionExitCode, ExecutionResult, ProcessGroupPolicy, history,
-    interfaces, pathcache, pathsearch, scripts, trace_categories, wellknownvars,
-};
-use crate::{
     builtins, commands, completion, env, error, expansion, functions, jobs, keywords, openfiles,
     prompt, sys::users, traps,
+};
+use crate::{
+    history, interfaces, pathcache, pathsearch, scripts, trace_categories, wellknownvars,
+    ExecutionControlFlow, ExecutionExitCode, ExecutionResult, ProcessGroupPolicy,
 };
 
 /// Type for storing a key bindings helper.
@@ -977,23 +977,31 @@ impl Shell {
     ) -> Result<ExecutionResult, error::Error> {
         // If parsing succeeded, run the program.
         let result = match parse_result {
-            Ok(prog) => self.run_program(prog, params).await,
-            Err(parse_err) => Err(error::Error::from(error::ErrorKind::ParseError(
-                parse_err,
-                source_info.clone(),
-            ))),
+            Ok(prog) => {
+                let r = self.run_program(prog, params).await;
+                r
+            }
+            Err(parse_err) => {
+                Err(error::Error::from(error::ErrorKind::ParseError(
+                    parse_err,
+                    source_info.clone(),
+                )))
+            }
         };
 
         // Report any errors.
-        match result {
-            Ok(result) => Ok(result),
+        let final_result = match result {
+            Ok(result) => {
+                Ok(result)
+            }
             Err(err) => {
                 let _ = self.display_error(&mut params.stderr(self), &err).await;
                 let exit_code = ExecutionExitCode::from(&err);
                 *self.last_exit_status_mut() = exit_code.into();
                 Ok(exit_code.into())
             }
-        }
+        };
+        final_result
     }
 
     /// Executes the given parsed shell program, returning the resulting exit status.

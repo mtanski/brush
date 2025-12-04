@@ -60,6 +60,64 @@ impl CommandFgControlExt for std::process::Command {
 fn setup_process_before_exec() -> Result<(), std::io::Error> {
     use crate::sys;
 
-    sys::terminal::move_self_to_foreground().map_err(std::io::Error::other)?;
+    // Reset job control signals to default disposition
+    // Parent (session leader) ignores these signals, but children should respond normally
+    // This allows Ctrl-Z, Ctrl-C, etc. to work in child processes
+    reset_job_control_signals()?;
+
+    // NOTE: Don't call move_self_to_foreground() here!
+    // The PARENT should manage foreground process group via tcsetpgrp() after getting child PID.
+    // Having child call tcsetpgrp() in pre_exec is unreliable and can cause race conditions.
+    // sys::terminal::move_self_to_foreground().map_err(std::io::Error::other)?;
+
+    Ok(())
+}
+
+/// Reset job control signals to SIG_DFL (default disposition)
+/// This undoes any SIG_IGN settings inherited from parent
+fn reset_job_control_signals() -> Result<(), std::io::Error> {
+    use nix::sys::signal::{signal, sigprocmask, SigHandler, SigSet, SigmaskHow, Signal};
+
+    eprintln!(
+        "[BRUSH] Resetting job control signals to SIG_DFL in child process (PID={})",
+        std::process::id()
+    );
+
+    // These signals should have default disposition in child processes
+    // even if the parent (session leader shell) ignores them
+    // SIGPIPE: Critical for pipeline handling - without it, writing to closed pipes blocks forever
+    let signals = [
+        Signal::SIGINT,
+        Signal::SIGQUIT,
+        Signal::SIGTSTP,
+        Signal::SIGTTOU,
+        Signal::SIGTTIN,
+        Signal::SIGPIPE,
+    ];
+
+    for sig in signals {
+        unsafe {
+            signal(sig, SigHandler::SigDfl).map_err(|e| {
+                std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("Failed to reset {:?} to SIG_DFL: {}", sig, e),
+                )
+            })?;
+        }
+    }
+
+    // CRITICAL: Also unblock these signals!
+    // Even with SIG_DFL handler, blocked signals won't be delivered
+    let mut sigset = SigSet::empty();
+    for sig in signals {
+        sigset.add(sig);
+    }
+    sigprocmask(SigmaskHow::SIG_UNBLOCK, Some(&sigset), None).map_err(|e| {
+        std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("Failed to unblock job control signals: {}", e),
+        )
+    })?;
+
     Ok(())
 }

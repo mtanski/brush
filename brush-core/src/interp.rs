@@ -453,28 +453,49 @@ async fn spawn_pipeline_processes(
 
 async fn wait_for_pipeline_processes_and_update_status(
     pipeline: &ast::Pipeline,
-    mut process_spawn_results: VecDeque<ExecutionSpawnResult>,
+    process_spawn_results: VecDeque<ExecutionSpawnResult>,
     shell: &mut Shell,
     params: &ExecutionParameters,
 ) -> Result<ExecutionResult, error::Error> {
     let mut result = ExecutionResult::success();
     let mut stopped_children = vec![];
 
-    // Clear our the pipeline status so we can start filling it out.
+    // Clear out the pipeline status so we can start filling it out.
     shell.last_pipeline_statuses.clear();
 
-    while let Some(child) = process_spawn_results.pop_front() {
-        match child.wait(!stopped_children.is_empty()).await? {
+    // Wait concurrently to avoid deadlocks (sequential waiting causes yes|head to hang)
+    // Track indices to preserve left-to-right pipeline order for exit codes
+    let wait_futures: Vec<_> = process_spawn_results
+        .into_iter()
+        .enumerate()
+        .map(|(idx, child)| async move { (idx, child.wait(false).await) })
+        .collect();
+
+    let mut indexed_results = futures::future::join_all(wait_futures).await;
+    eprintln!(
+        "[DEBUG] join_all completed, {} results",
+        indexed_results.len()
+    );
+
+    // Sort by index to restore correct pipeline order (last command = exit code)
+    indexed_results.sort_by_key(|(idx, _)| *idx);
+
+    for (idx, wait_result) in indexed_results {
+        match wait_result? {
             ExecutionWaitResult::Completed(current_result) => {
                 result = current_result;
                 *shell.last_exit_status_mut() = result.exit_code.into();
                 shell.last_pipeline_statuses.push(result.exit_code.into());
+                eprintln!(
+                    "[DEBUG] Result {} completed, exit_code={}",
+                    idx,
+                    u8::from(result.exit_code)
+                );
             }
             ExecutionWaitResult::Stopped(child) => {
                 result = ExecutionResult::stopped();
                 *shell.last_exit_status_mut() = result.exit_code.into();
                 shell.last_pipeline_statuses.push(result.exit_code.into());
-
                 stopped_children.push(jobs::JobTask::External(child));
             }
         }
@@ -782,8 +803,8 @@ impl Execute for (WhileOrUntil, &ast::WhileOrUntilClauseCommand) {
             WhileOrUntil::While => true,
             WhileOrUntil::Until => false,
         };
-        let test_condition = &self.1.0;
-        let body = &self.1.1;
+        let test_condition = &self.1 .0;
+        let body = &self.1 .1;
 
         let mut result = ExecutionResult::success();
 

@@ -48,7 +48,8 @@ impl ChildProcess {
                     break Ok(ProcessWaitResult::Stopped)
                 },
                 _ = sigchld.recv() => {
-                    if sys::signal::poll_for_stopped_children()? {
+                    let found_stopped = sys::signal::poll_for_stopped_children()?;
+                    if found_stopped {
                         break Ok(ProcessWaitResult::Stopped);
                     }
                 },

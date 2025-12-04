@@ -5,12 +5,12 @@ use std::fmt::Display;
 
 use futures::FutureExt;
 
-use crate::ExecutionResult;
 use crate::error;
 use crate::processes;
 use crate::sys;
 use crate::trace_categories;
 use crate::traps;
+use crate::ExecutionResult;
 
 pub(crate) type JobJoinHandle = tokio::task::JoinHandle<Result<ExecutionResult, error::Error>>;
 pub(crate) type JobResult = (Job, Result<ExecutionResult, error::Error>);
@@ -43,12 +43,32 @@ impl JobTask {
     pub async fn wait(&mut self) -> Result<JobTaskWaitResult, error::Error> {
         match self {
             Self::External(process) => {
+                eprintln!(
+                    "[BRUSH_JOB] Calling process.wait() for PID {:?}",
+                    process.pid()
+                );
                 let wait_result = process.wait().await?;
+                eprintln!(
+                    "[BRUSH_JOB] process.wait() returned: {:?}",
+                    match &wait_result {
+                        processes::ProcessWaitResult::Completed(_) => "Completed",
+                        processes::ProcessWaitResult::Stopped => "Stopped",
+                    }
+                );
                 match wait_result {
                     processes::ProcessWaitResult::Completed(output) => {
+                        eprintln!(
+                            "[BRUSH_JOB] Process completed, exit code: {:?}",
+                            output.status.code()
+                        );
                         Ok(JobTaskWaitResult::Completed(output.into()))
                     }
-                    processes::ProcessWaitResult::Stopped => Ok(JobTaskWaitResult::Stopped),
+                    processes::ProcessWaitResult::Stopped => {
+                        eprintln!(
+                            "[BRUSH_JOB] *** Process STOPPED (will return exit code 148) ***"
+                        );
+                        Ok(JobTaskWaitResult::Stopped)
+                    }
                 }
             }
             Self::Internal(handle) => Ok(JobTaskWaitResult::Completed(handle.await??)),
@@ -360,6 +380,7 @@ impl Job {
         while let Some(task) = self.tasks.back_mut() {
             match task.wait().await? {
                 JobTaskWaitResult::Completed(execution_result) => {
+                    let _code: u8 = execution_result.exit_code.into();
                     result = execution_result;
                     self.tasks.pop_back();
                 }

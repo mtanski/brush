@@ -101,9 +101,24 @@ pub fn move_self_to_foreground() -> Result<(), error::Error> {
     if std::io::stdin().is_terminal() {
         let pgid = nix::unistd::getpgid(None)?;
 
+        eprintln!(
+            "[BRUSH] move_self_to_foreground: stdin is terminal, my pgid={}",
+            pgid
+        );
+
         // TODO: jobs: This sometimes fails with ENOTTY even though we checked that stdin is a
         // terminal. We should investigate why this is happening.
-        let _ = nix::unistd::tcsetpgrp(std::io::stdin(), pgid);
+        match nix::unistd::tcsetpgrp(std::io::stdin(), pgid) {
+            Ok(_) => {
+                eprintln!(
+                    "[BRUSH] tcsetpgrp succeeded - moved pgid {} to foreground",
+                    pgid
+                );
+            }
+            Err(e) => {
+            }
+        }
+    } else {
     }
 
     Ok(())
