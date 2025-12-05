@@ -43,30 +43,16 @@ impl JobTask {
     pub async fn wait(&mut self) -> Result<JobTaskWaitResult, error::Error> {
         match self {
             Self::External(process) => {
-                eprintln!(
-                    "[BRUSH_JOB] Calling process.wait() for PID {:?}",
-                    process.pid()
-                );
+
                 let wait_result = process.wait().await?;
-                eprintln!(
-                    "[BRUSH_JOB] process.wait() returned: {:?}",
-                    match &wait_result {
-                        processes::ProcessWaitResult::Completed(_) => "Completed",
-                        processes::ProcessWaitResult::Stopped => "Stopped",
-                    }
-                );
+
                 match wait_result {
                     processes::ProcessWaitResult::Completed(output) => {
-                        eprintln!(
-                            "[BRUSH_JOB] Process completed, exit code: {:?}",
-                            output.status.code()
-                        );
+
                         Ok(JobTaskWaitResult::Completed(output.into()))
                     }
                     processes::ProcessWaitResult::Stopped => {
-                        eprintln!(
-                            "[BRUSH_JOB] *** Process STOPPED (will return exit code 148) ***"
-                        );
+
                         Ok(JobTaskWaitResult::Stopped)
                     }
                 }

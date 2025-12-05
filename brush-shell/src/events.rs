@@ -101,7 +101,7 @@ impl TraceEventConfig {
             config.handle = Some(handle);
         } else {
             // Something went wrong; proceed on anyway but complain audibly.
-            eprintln!("warning: failed to initialize tracing.");
+    
         }
 
         config

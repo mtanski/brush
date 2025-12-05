@@ -444,17 +444,8 @@ pub(crate) fn execute_external_command(
                 // PARENT moves child to foreground (canonical bash job control)
                 // This must be done by parent, not child, to avoid race conditions
                 if new_pg && child_stdin_is_terminal {
-                    match nix::unistd::tcsetpgrp(std::io::stdin(), nix::unistd::Pid::from_raw(*pid))
-                    {
-                        Ok(_) => {
-                            eprintln!(
-                                "[BRUSH] Parent tcsetpgrp succeeded - child {} is now foreground",
-                                pid
-                            );
-                        }
-                        Err(_e) => {
-                        }
-                    }
+                    let _ =
+                        nix::unistd::tcsetpgrp(std::io::stdin(), nix::unistd::Pid::from_raw(*pid));
                 }
             } else {
                 tracing::warn!("could not retrieve pid for child process");

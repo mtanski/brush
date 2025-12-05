@@ -78,10 +78,7 @@ fn setup_process_before_exec() -> Result<(), std::io::Error> {
 fn reset_job_control_signals() -> Result<(), std::io::Error> {
     use nix::sys::signal::{signal, sigprocmask, SigHandler, SigSet, SigmaskHow, Signal};
 
-    eprintln!(
-        "[BRUSH] Resetting job control signals to SIG_DFL in child process (PID={})",
-        std::process::id()
-    );
+
 
     // These signals should have default disposition in child processes
     // even if the parent (session leader shell) ignores them

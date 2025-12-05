@@ -743,7 +743,7 @@ mod tests {
     fn make_extglob(s: &str) -> Pattern {
         let pattern = Pattern::from(s).set_extended_globbing(true);
         let regex_str = pattern.to_regex_str(true, true).unwrap();
-        eprintln!("pattern: '{s}' => regex: '{regex_str}'");
+
 
         pattern
     }

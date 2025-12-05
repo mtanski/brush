@@ -472,10 +472,7 @@ async fn wait_for_pipeline_processes_and_update_status(
         .collect();
 
     let mut indexed_results = futures::future::join_all(wait_futures).await;
-    eprintln!(
-        "[DEBUG] join_all completed, {} results",
-        indexed_results.len()
-    );
+
 
     // Sort by index to restore correct pipeline order (last command = exit code)
     indexed_results.sort_by_key(|(idx, _)| *idx);
@@ -486,11 +483,7 @@ async fn wait_for_pipeline_processes_and_update_status(
                 result = current_result;
                 *shell.last_exit_status_mut() = result.exit_code.into();
                 shell.last_pipeline_statuses.push(result.exit_code.into());
-                eprintln!(
-                    "[DEBUG] Result {} completed, exit_code={}",
-                    idx,
-                    u8::from(result.exit_code)
-                );
+
             }
             ExecutionWaitResult::Stopped(child) => {
                 result = ExecutionResult::stopped();

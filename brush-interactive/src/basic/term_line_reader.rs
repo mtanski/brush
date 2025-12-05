@@ -111,7 +111,7 @@ impl<'a> ReadLineState<'a> {
                 self.on_char(c)?;
             }
             (crossterm::event::KeyModifiers::CONTROL, crossterm::event::KeyCode::Char('c')) => {
-                eprintln!("^C");
+        
                 return Ok(Some(ReadResult::Interrupted));
             }
             (crossterm::event::KeyModifiers::CONTROL, crossterm::event::KeyCode::Char('d')) => {
@@ -149,7 +149,7 @@ impl<'a> ReadLineState<'a> {
     }
 
     fn display_newline() -> Result<(), ShellError> {
-        eprintln!();
+
         std::io::stderr().flush()?;
 
         Ok(())
@@ -275,7 +275,7 @@ impl<'a> ReadLineState<'a> {
         Self::display_newline()?;
         for candidate in &completions.candidates {
             let formatted = format_completion_candidate(candidate.as_str(), &completions.options);
-            eprintln!("{formatted}");
+
         }
         std::io::stderr().flush()?;
 
